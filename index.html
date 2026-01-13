@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Assignment Tracker">
+    <title>Winter 2026 Assignment Tracker</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .flip-card {
+            perspective: 1000px;
+            cursor: pointer;
+        }
+        
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        
+        .flip-card-front,
+        .flip-card-back {
+            position: relative;
+            width: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        
+        .flip-card-back {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform: rotateY(180deg);
+        }
+        
+        #loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(to bottom right, #faf5ff, #fce7f3, #eff6ff);
+            flex-direction: column;
+        }
+        
+        #error-log {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            max-width: 600px;
+            text-align: left;
+            font-size: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+            <div style="font-size: 20px; color: #9333ea; font-weight: 600;" id="status">Loading Assignment Tracker...</div>
+        </div>
+        <div id="error-log"></div>
+    </div>
+    <div id="root"></div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const errorLog = document.getElementById('error-log');
+        
+        function log(msg) {
+            console.log(msg);
+            errorLog.style.display = 'block';
+            errorLog.innerHTML += msg + '<br>';
+        }
+        
+        function updateStatus(msg) {
+            statusEl.textContent = msg;
+            log(msg);
+        }
+        
+        updateStatus('Step 1: HTML loaded');
+        
+        // Catch all errors
+        window.onerror = function(msg, url, line, col, error) {
+            log(`ERROR: ${msg} at ${url}:${line}:${col}`);
+            return false;
+        };
+    </script>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js" onload="updateStatus('Step 2: React loaded')" onerror="updateStatus('ERROR: React failed to load')"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" onload="updateStatus('Step 3: ReactDOM loaded')" onerror="updateStatus('ERROR: ReactDOM failed to load')"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js" onload="updateStatus('Step 4: Babel loaded')" onerror="updateStatus('ERROR: Babel failed to load')"></script>
+    
+    <script type="text/babel">
+        updateStatus('Step 5: Starting React app...');
+        
+        try {
+            document.getElementById('loading').style.display = 'none';
+            
+            const { useState, useEffect } = React;
+
+            const gradingData = {
+              soc173: {
+                components: [
+                  { name: 'Assignments', description: 'Various writing assignments', percentage: null },
+                  { name: 'Exams', description: 'Midterm and Final', percentage: null }
+                ],
+                note: 'Complete grading breakdown not available in provided syllabus',
+                gradeScale: null
+              },
+              soc130: {
+                components: [
+                  { name: 'Weekly Reflections', description: '8 reflections × 10 pts', percentage: '80%', bar: 80 },
+                  { name: 'Final Assignment', description: '1 assignment', percentage: '20%', bar: 20 },
+                  { name: 'Extra Credit', description: 'Optional (max 8 pts)', percentage: '+8 pts', bar: 0 }
+                ],
+                note: 'Total: 100 pts (108 with extra credit)',
+                gradeScale: [
+                  { grade: 'A+', range: '98-108' },
+                  { grade: 'A', range: '93-97' },
+                  { grade: 'A-', range: '90-92' }
+                ]
+              },
+              anth5: {
+                components: [
+                  { name: 'Section Attendance', description: 'Miss one for free', percentage: '10%', bar: 10 },
+                  { name: 'Problem Sets', description: '7 sets (drop lowest)', percentage: '40%', bar: 40 },
+                  { name: 'Midterm Exam', description: 'Mixed format', percentage: '20%', bar: 20 },
+                  { name: 'Final Exam', description: 'Mixed format', percentage: '30%', bar: 30 }
+                ],
+                note: 'Total: 100%',
+                gradeScale: [
+                  { grade: 'A+', range: '97-100' },
+                  { grade: 'A', range: '93-96' },
+                  { grade: 'A-', range: '90-92' },
+                  { grade: 'B+', range: '87-89' },
+                  { grade: 'B', range: '83-86' },
+                  { grade: 'B-', range: '80-82' }
+                ]
+              }
+            };
+
+            const CheckSquare = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <polyline points="9 11 12 14 22 4"></polyline>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+            );
+
+            const Square = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                </svg>
+            );
+
+            const Archive = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                    <rect x="1" y="3" width="22" height="5"></rect>
+                    <line x1="10" y1="12" x2="14" y2="12"></line>
+                </svg>
+            );
+
+            const ArchiveRestore = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="1" y="3" width="22" height="5"></rect>
+                    <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                    <line x1="10" y1="12" x2="14" y2="12"></line>
+                </svg>
+            );
+
+            const AlertCircle = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+            );
+
+            const Calendar = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+            );
+
+            const Book = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+            );
+
+            const Bell = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+            );
+
+            const BellOff = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    <path d="M18.63 13A17.89 17.89 0 0 1 18 8"></path>
+                    <path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"></path>
+                    <path d="M18 8a6 6 0 0 0-9.33-5"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                </svg>
+            );
+
+            const AssignmentTracker = () => {
+              const [activeTab, setActiveTab] = useState('soc173');
+              const [showArchived, setShowArchived] = useState(false);
+              const [cardFlipped, setCardFlipped] = useState(false);
+              const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+              const [notificationPermission, setNotificationPermission] = useState('default');
+              const [assignments, setAssignments] = useState({
+                soc173: [
+                  { id: 1, name: 'Lyrics of the Law', dueDate: 'Jan 14 @ 3:30 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 2, name: '24-Hour Log of the Law', dueDate: 'Jan 21 @ 3:30 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 3, name: 'Midterm Exam', dueDate: 'Feb 9 (in class)', completed: false, archived: false, type: 'exam' },
+                  { id: 4, name: 'Laura Nader Worksheet', dueDate: 'Feb 11 (in class)', completed: false, archived: false, type: 'assignment', note: 'In-class only - no late submissions' },
+                  { id: 5, name: 'Dispute Paper', dueDate: 'Mar 1 @ 11:59 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 6, name: 'Final Exam', dueDate: 'Mar 20, 12:00-1:30 PM', completed: false, archived: false, type: 'exam' }
+                ],
+                soc130: [
+                  { id: 1, name: 'Reflection #1', dueDate: 'Jan 14 @ 4:00 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 2, name: 'Reflection #2', dueDate: 'Jan 21 @ 4:00 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 3, name: 'Reflection #3', dueDate: 'Jan 28 @ 4:00 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 4, name: 'Reflection #4', dueDate: 'Feb 4 @ 4:00 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 5, name: 'Reflection #5', dueDate: 'Feb 11 @ 4:00 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 6, name: 'Reflection #6', dueDate: 'Feb 18 @ 4:00 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 7, name: 'Reflection #7', dueDate: 'Mar 4 @ 4:00 PM', completed: false, archived: false, type: 'assignment', discrepancy: 'Syllabus shows Feb 25, Canvas extended to Mar 4' },
+                  { id: 8, name: 'Reflection #8', dueDate: 'Mar 11 @ 4:00 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 9, name: 'Final Assignment', dueDate: 'Mar 18 @ 11:59 PM', completed: false, archived: false, type: 'assignment', discrepancy: 'Syllabus says 10:00 PM, Canvas allows 11:59 PM' },
+                  { id: 10, name: 'Extra Credit (Optional)', dueDate: 'Mar 18 @ 10:00 PM', completed: false, archived: false, type: 'extra', discrepancy: 'Canvas shows 10 pts, syllabus caps at 8 pts' }
+                ],
+                anth5: [
+                  { id: 1, name: 'Problem Set #1', dueDate: 'Jan 11 @ 11:59 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 2, name: 'Problem Set #2', dueDate: 'Jan 18 @ 11:59 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 3, name: 'Problem Set #3', dueDate: 'Jan 25 @ 11:59 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 4, name: 'Problem Set #4', dueDate: 'Feb 1 @ 11:59 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 5, name: 'Problem Set #5', dueDate: 'Feb 15 @ 11:59 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 6, name: 'Problem Set #6', dueDate: 'Feb 22 @ 11:59 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 7, name: 'Problem Set #7', dueDate: 'Mar 1 @ 11:59 PM', completed: false, archived: false, type: 'assignment' },
+                  { id: 8, name: 'Midterm Exam', dueDate: 'Feb 10 (in class)', completed: false, archived: false, type: 'exam' },
+                  { id: 9, name: 'Final Exam', dueDate: 'Mar 17 @ 8:00 AM', completed: false, archived: false, type: 'exam' }
+                ]
+              });
+
+              useEffect(() => {
+                const saved = localStorage.getItem('winter2026-assignments');
+                if (saved) {
+                  setAssignments(JSON.parse(saved));
+                }
+                
+                const savedNotifSettings = localStorage.getItem('winter2026-notif-enabled');
+                if (savedNotifSettings) {
+                  setNotificationsEnabled(JSON.parse(savedNotifSettings));
+                }
+                
+                if ('Notification' in window) {
+                  setNotificationPermission(Notification.permission);
+                }
+              }, []);
+
+              const isIOS = () => {
+                return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+              };
+
+              useEffect(() => {
+                localStorage.setItem('winter2026-assignments', JSON.stringify(assignments));
+              }, [assignments]);
+
+              useEffect(() => {
+                setCardFlipped(false);
+              }, [activeTab]);
+
+              const toggleComplete = (classId, assignmentId) => {
+                setAssignments(prev => ({
+                  ...prev,
+                  [classId]: prev[classId].map(a => 
+                    a.id === assignmentId ? { ...a, completed: !a.completed } : a
+                  )
+                }));
+              };
+
+              const toggleArchive = (classId, assignmentId) => {
+                setAssignments(prev => ({
+                  ...prev,
+                  [classId]: prev[classId].map(a => 
+                    a.id === assignmentId ? { ...a, archived: !a.archived } : a
+                  )
+                }));
+              };
+
+              const getProgress = (classId) => {
+                const items = assignments[classId];
+                const completed = items.filter(a => a.completed).length;
+                return { completed, total: items.length, percentage: Math.round((completed / items.length) * 100) };
+              };
+
+              const getFilteredAssignments = (classId) => {
+                return showArchived 
+                  ? assignments[classId]
+                  : assignments[classId].filter(a => !a.archived);
+              };
+
+              const getArchivedCount = (classId) => {
+                return assignments[classId].filter(a => a.archived).length;
+              };
+
+              const parseDueDate = (dueDateStr) => {
+                try {
+                  const monthMap = {
+                    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+                  };
+                  
+                  const match = dueDateStr.match(/(\w+)\s+(\d+)/);
+                  if (!match) return null;
+                  
+                  const month = monthMap[match[1]];
+                  const day = parseInt(match[2]);
+                  const year = 2026;
+                  
+                  const timeMatch = dueDateStr.match(/(\d+):(\d+)\s*(AM|PM)/);
+                  let hours = 23, minutes = 59;
+                  
+                  if (timeMatch) {
+                    hours = parseInt(timeMatch[1]);
+                    minutes = parseInt(timeMatch[2]);
+                    if (timeMatch[3] === 'PM' && hours !== 12) hours += 12;
+                    if (timeMatch[3] === 'AM' && hours === 12) hours = 0;
+                  }
+                  
+                  return new Date(year, month, day, hours, minutes);
+                } catch (error) {
+                  console.error('Error parsing date:', dueDateStr, error);
+                  return null;
+                }
+              };
+
+              const isDueSoon = (dueDateStr) => {
+                const dueDate = parseDueDate(dueDateStr);
+                if (!dueDate) return false;
+                
+                const now = new Date();
+                const hoursUntilDue = (dueDate - now) / (1000 * 60 * 60);
+                
+                return hoursUntilDue > 0 && hoursUntilDue <= 24;
+              };
+
+              const getUpcomingAssignments = () => {
+                const upcoming = [];
+                Object.entries(assignments).forEach(([classId, items]) => {
+                  items.forEach(assignment => {
+                    if (!assignment.completed && !assignment.archived && isDueSoon(assignment.dueDate)) {
+                      const className = tabs.find(t => t.id === classId)?.name || classId;
+                      upcoming.push({ ...assignment, className, classId });
+                    }
+                  });
+                });
+                return upcoming.sort((a, b) => {
+                  const dateA = parseDueDate(a.dueDate);
+                  const dateB = parseDueDate(b.dueDate);
+                  return dateA - dateB;
+                });
+              };
+
+              const toggleNotifications = () => {
+                if (!notificationsEnabled) {
+                  if (isIOS()) {
+                    alert('📱 iOS Safari doesn\'t support push notifications.\n\nBut you\'re all set! You\'ll see the orange "Upcoming Deadlines" alert banner whenever you open the app and have assignments due within 24 hours.\n\n💡 Tip: Check the app daily to stay on top of your deadlines!');
+                    
+                    setNotificationsEnabled(true);
+                    localStorage.setItem('winter2026-notif-enabled', 'true');
+                    return;
+                  }
+                  
+                  if (!('Notification' in window)) {
+                    alert('Your browser doesn\'t support notifications. You\'ll still see visual alerts when you open the app!');
+                    setNotificationsEnabled(true);
+                    localStorage.setItem('winter2026-notif-enabled', 'true');
+                    return;
+                  }
+                  
+                  Notification.requestPermission().then(permission => {
+                    setNotificationPermission(permission);
+                    
+                    if (permission === 'granted') {
+                      setNotificationsEnabled(true);
+                      localStorage.setItem('winter2026-notif-enabled', 'true');
+                      
+                      new Notification('Notifications Enabled! 🔔', {
+                        body: 'You\'ll receive reminders for assignments due within 24 hours',
+                        icon: '✅'
+                      });
+                    } else if (permission === 'denied') {
+                      alert('Notifications were blocked. You can still use visual alerts by keeping the app open!');
+                      setNotificationsEnabled(true);
+                      localStorage.setItem('winter2026-notif-enabled', 'true');
+                    }
+                  });
+                  
+                } else {
+                  setNotificationsEnabled(false);
+                  localStorage.setItem('winter2026-notif-enabled', 'false');
+                }
+              };
+
+              const tabs = [
+                { id: 'soc173', name: 'SOC 173', fullName: 'Sociology of Law', color: 'from-purple-500 to-pink-500' },
+                { id: 'soc130', name: 'SOC 130', fullName: 'Sociology of Revolutions', color: 'from-pink-500 to-rose-500' },
+                { id: 'anth5', name: 'ANTH 5', fullName: 'Biological Anthropology', color: 'from-blue-500 to-indigo-500' }
+              ];
+
+              const currentTab = tabs.find(t => t.id === activeTab);
+              const progress = getProgress(activeTab);
+              const filteredAssignments = getFilteredAssignments(activeTab);
+              const upcomingAssignments = getUpcomingAssignments();
+              const grading = gradingData[activeTab];
+
+              return (
+                <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-6">
+                  <div className="max-w-4xl mx-auto">
+                    <div className="text-center mb-8">
+                      <div className="flex items-center justify-center gap-4 mb-2">
+                        <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
+                          Winter 2026 Assignment Tracker
+                        </h1>
+                        <button
+                          type="button"
+                          onClick={toggleNotifications}
+                          className={`p-4 rounded-xl transition-all cursor-pointer active:scale-95 select-none ${
+                            notificationsEnabled
+                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                              : 'bg-white text-gray-600 shadow'
+                          }`}
+                          style={{ 
+                            minWidth: '56px', 
+                            minHeight: '56px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            WebkitTapHighlightColor: 'transparent',
+                            touchAction: 'manipulation'
+                          }}
+                        >
+                          {notificationsEnabled ? <Bell className="w-6 h-6" /> : <BellOff className="w-6 h-6" />}
+                        </button>
+                      </div>
+                      <p className="text-gray-600">Stay on top of your coursework ✨</p>
+                    </div>
+
+                    {upcomingAssignments.length > 0 && (
+                      <div className="mb-6 bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200 rounded-2xl p-5 shadow-lg">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-6 h-6 text-orange-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-orange-900 mb-3">
+                              ⏰ Upcoming Deadlines (Next 24 Hours)
+                            </h3>
+                            <div className="space-y-2">
+                              {upcomingAssignments.map(assignment => (
+                                <div
+                                  key={`${assignment.classId}-${assignment.id}`}
+                                  className="flex items-center justify-between bg-white/70 rounded-lg p-3"
+                                >
+                                  <div>
+                                    <span className="font-semibold text-gray-800">{assignment.name}</span>
+                                    <span className="text-sm text-gray-600 ml-2">({assignment.className})</span>
+                                  </div>
+                                  <span className="text-sm font-medium text-orange-700">
+                                    {assignment.dueDate}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 mb-6 overflow-x-auto">
+                      {tabs.map(tab => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id)}
+                          className={`flex-1 min-w-fit px-6 py-4 rounded-2xl font-semibold transition-all ${
+                            activeTab === tab.id
+                              ? `bg-gradient-to-r ${tab.color} text-white shadow-lg scale-105`
+                              : 'bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="text-sm opacity-90">{tab.name}</div>
+                          <div className="text-xs mt-1">{tab.fullName}</div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className={`flip-card mb-6 ${cardFlipped ? 'flipped' : ''}`} onClick={() => setCardFlipped(!cardFlipped)}>
+                      <div className="flip-card-inner">
+                        <div className={`flip-card-front bg-gradient-to-r ${currentTab.color} rounded-2xl p-6 text-white shadow-lg`}>
+                          <div className="flex items-center justify-between mb-4">
+                            <div>
+                              <h2 className="text-2xl font-bold">{currentTab.fullName}</h2>
+                              <p className="text-sm opacity-90 mt-1">
+                                {progress.completed} of {progress.total} assignments completed
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-4xl font-bold">{progress.percentage}%</div>
+                              <div className="text-sm opacity-90">Complete</div>
+                            </div>
+                          </div>
+                          <div className="w-full bg-white/30 rounded-full h-3 overflow-hidden">
+                            <div 
+                              className="bg-white h-full rounded-full transition-all duration-500"
+                              style={{ width: `${progress.percentage}%` }}
+                            />
+                          </div>
+                          <div className="text-center mt-4 text-xs opacity-75">
+                            📊 Click to view grading breakdown
+                          </div>
+                        </div>
+
+                        <div className={`flip-card-back bg-gradient-to-r ${currentTab.color} rounded-2xl p-6 text-white shadow-lg`}>
+                          <h2 className="text-2xl font-bold mb-4">Grading Breakdown</h2>
+                          
+                          <div className="space-y-3 mb-4">
+                            {grading.components.map((component, idx) => (
+                              <div key={idx} className="bg-white/20 rounded-lg p-3">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="font-semibold text-sm">{component.name}</span>
+                                  <span className="text-sm font-bold">{component.percentage}</span>
+                                </div>
+                                <div className="text-xs opacity-90 mb-2">{component.description}</div>
+                                {component.bar !== undefined && (
+                                  <div className="w-full bg-white/30 rounded-full h-2">
+                                    <div 
+                                      className="bg-white h-full rounded-full"
+                                      style={{ width: `${component.bar}%` }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {grading.note && (
+                            <div className="text-xs bg-white/20 rounded-lg p-2 mb-3">
+                              {grading.note}
+                            </div>
+                          )}
+
+                          {grading.gradeScale && (
+                            <div>
+                              <div className="text-sm font-semibold mb-2">Letter Grades:</div>
+                              <div className="grid grid-cols-3 gap-2 text-xs">
+                                {grading.gradeScale.map((item, idx) => (
+                                  <div key={idx} className="bg-white/20 rounded px-2 py-1 text-center">
+                                    <span className="font-bold">{item.grade}</span>: {item.range}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="text-center mt-4 text-xs opacity-75">
+                            📊 Click to return
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end mb-4">
+                      <button
+                        onClick={() => setShowArchived(!showArchived)}
+                        className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow hover:shadow-md transition-all"
+                      >
+                        {showArchived ? (
+                          <>
+                            <ArchiveRestore className="w-4 h-4" />
+                            <span className="text-sm font-medium">Hide Archived</span>
+                          </>
+                        ) : (
+                          <>
+                            <Archive className="w-4 h-4" />
+                            <span className="text-sm font-medium">Show Archived ({getArchivedCount(activeTab)})</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-lg p-6">
+                      {filteredAssignments.length === 0 ? (
+                        <div className="text-center py-12">
+                          <Archive className="w-16 h-16 mx-auto mb-4 text-purple-500" />
+                          <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                            Nothing to see here! 📦
+                          </h3>
+                          <p className="text-gray-500">
+                            All assignments are archived. Click "Show Archived" to view them.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {filteredAssignments.map(assignment => (
+                            <div
+                              key={assignment.id}
+                              className={`group relative p-4 rounded-xl border-2 transition-all ${
+                                assignment.completed
+                                  ? 'border-green-200 bg-green-50/50'
+                                  : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-md'
+                              }`}
+                            >
+                              <div className="flex items-start gap-4">
+                                <button
+                                  onClick={() => toggleComplete(activeTab, assignment.id)}
+                                  className="flex-shrink-0 mt-1 transition-transform hover:scale-110"
+                                >
+                                  {assignment.completed ? (
+                                    <CheckSquare className="w-6 h-6 text-green-500" />
+                                  ) : (
+                                    <Square className="w-6 h-6 text-gray-400 group-hover:text-purple-500" />
+                                  )}
+                                </button>
+
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <h3 className={`font-semibold ${
+                                      assignment.completed ? 'text-green-700' : 'text-gray-800'
+                                    }`}>
+                                      {assignment.name}
+                                      {assignment.completed && (
+                                        <span className="ml-2 text-xs font-normal text-green-600">✓ Complete</span>
+                                      )}
+                                    </h3>
+                                    
+                                    <span className={`flex-shrink-0 px-2 py-1 text-xs font-medium rounded-lg ${
+                                      assignment.type === 'exam' 
+                                        ? 'bg-red-100 text-red-700'
+                                        : assignment.type === 'extra'
+                                        ? 'bg-yellow-100 text-yellow-700'
+                                        : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                      {assignment.type === 'exam' ? 'Exam' : assignment.type === 'extra' ? 'Extra Credit' : 'Assignment'}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                                    <Calendar className="w-4 h-4" />
+                                    <span>Due: {assignment.dueDate}</span>
+                                  </div>
+
+                                  {assignment.discrepancy && (
+                                    <div className="flex items-start gap-2 mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                      <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                                      <p className="text-xs text-yellow-800">
+                                        <strong>Note:</strong> {assignment.discrepancy}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {assignment.note && (
+                                    <div className="flex items-start gap-2 mt-2 text-xs text-gray-600 italic">
+                                      <Book className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                      <span>{assignment.note}</span>
+                                    </div>
+                                  )}
+
+                                  {assignment.completed && !assignment.archived && (
+                                    <button
+                                      onClick={() => toggleArchive(activeTab, assignment.id)}
+                                      className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                      <Archive className="w-4 h-4" />
+                                      <span>Archive</span>
+                                    </button>
+                                  )}
+                                  {assignment.archived && (
+                                    <button
+                                      onClick={() => toggleArchive(activeTab, assignment.id)}
+                                      className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                      <ArchiveRestore className="w-4 h-4" />
+                                      <span>Unarchive</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-6 text-center text-sm text-gray-500">
+                      <p>
+                        {showArchived 
+                          ? `Viewing all ${assignments[activeTab].length} assignments`
+                          : `${filteredAssignments.length} active • ${getArchivedCount(activeTab)} archived`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            };
+
+            updateStatus('Step 6: Rendering app...');
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<AssignmentTracker />);
+            updateStatus('✅ App loaded successfully!');
+            
+        } catch (error) {
+            log('FATAL ERROR: ' + error.message);
+            log('Stack: ' + error.stack);
+            document.getElementById('loading').innerHTML = `
+                <div style="padding: 40px; text-align: center; background: white; border-radius: 20px; margin: 20px; max-width: 600px;">
+                    <div style="font-size: 64px; margin-bottom: 20px;">❌</div>
+                    <h2 style="color: #dc2626; margin-bottom: 16px;">App Failed to Load</h2>
+                    <p style="color: #666; margin-bottom: 20px;">There was an error loading the React app.</p>
+                    <div style="background: #fee2e2; padding: 16px; border-radius: 12px; text-align: left; font-size: 12px; font-family: monospace; overflow-x: auto;">
+                        ${error.message}<br><br>${error.stack}
+                    </div>
+                    <p style="color: #666; margin-top: 20px; font-size: 14px;">
+                        Please upload this file to GitHub Pages for full functionality.
+                    </p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
